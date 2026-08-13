@@ -1,0 +1,25 @@
+# -------- Node / pake 生成物 --------
+node_modules/
+package.json
+package-lock.json
+pnpm-lock.yaml
+
+# -------- pake/Tauri 构建产物 --------
+src-tauri/
+Cargo.lock
+
+# -------- CI 收集目录 --------
+dist/
+
+# -------- 安装包与二进制 --------
+*.dmg
+*.msi
+*.exe
+*.deb
+*.rpm
+*.AppImage
+*.app
+
+# -------- 系统与编辑器 --------
+.DS_Store
+*.log
