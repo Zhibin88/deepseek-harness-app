@@ -6,8 +6,8 @@
 #   2) 手动触发 Actions 页面的 workflow_dispatch（Debug/预发布）
 #
 # 产物：
-#   macOS  -> DeepSeekHarness.dmg        （默认 universal，同时支持 Intel/Apple Silicon）
-#   Windows-> DeepSeekHarness.msi（pake 3.x 在 Windows 默认只产出 MSI）
+#   macOS  -> DeepSeekHarness.dmg          （universal 双架构：Intel x86_64 + Apple Silicon arm64）
+#   Windows-> DeepSeekHarness_x64.msi + DeepSeekHarness_arm64.msi（ARM 版为尽力而为）
 #   Linux  -> .deb + .AppImage（+ .rpm，可通过 input 调整）
 # =============================================================================
 name: Build & Release
@@ -86,7 +86,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          target: x86_64-pc-windows-msvc
+          target: x86_64-pc-windows-msvc, aarch64-pc-windows-msvc
 
       - name: Add macOS universal targets
         if: runner.os == 'macOS'
@@ -186,14 +186,28 @@ jobs:
           if [ "$MULTI_ARCH" = "true" ]; then ARGS+=(--multi-arch); fi
           npx --no-install pake "${ARGS[@]}"
 
-      - name: Build (Windows)
+      - name: Build Windows (x64)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           # 注意：不要用 $args 变量名（PowerShell 只读自动变量，赋值会静默失败导致参数为空）
+          New-Item -ItemType Directory -Force dist | Out-Null
           & npx --no-install pake "$env:APP_URL" --name "$env:APP_NAME" --title "$env:APP_TITLE" `
             --identifier "$env:APP_IDENTIFIER" --icon "assets/icon.png" `
             --width 1280 --height 800 --app-version "$env:APP_VERSION" --targets x64
+          # pake 会把安装包复制到工作区根目录；马上改名移进 dist，避免被下一次构建覆盖
+          if (Test-Path "$env:APP_NAME.msi") { Move-Item "$env:APP_NAME.msi" "dist/${env:APP_NAME}_x64.msi" -Force }
+
+      - name: Build Windows (arm64)  # 尽力而为：若 runner 缺少 ARM64 工具链则跳过，不影响其余产物
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          & npx --no-install pake "$env:APP_URL" --name "$env:APP_NAME" --title "$env:APP_TITLE" `
+            --identifier "$env:APP_IDENTIFIER" --icon "assets/icon.png" `
+            --width 1280 --height 800 --app-version "$env:APP_VERSION" --targets arm64
+          if (Test-Path "$env:APP_NAME.msi") { Move-Item "$env:APP_NAME.msi" "dist/${env:APP_NAME}_arm64.msi" -Force }
 
       - name: Build (Linux)
         if: runner.os == 'Linux'

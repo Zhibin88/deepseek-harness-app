@@ -41,7 +41,7 @@ dsh web
 
 # 4. 安装：产物在当前目录
 #    macOS  双击 DeepSeekHarness_*.dmg
-#    Windows 双击 DeepSeekHarness.msi
+#    Windows 双击 DeepSeekHarness_x64.msi（AMD/Intel）或 DeepSeekHarness_arm64.msi（骁龙等 ARM）
 #    Linux  sudo dpkg -i deepseek-harness_*.deb  或 运行 *.AppImage
 ```
 
@@ -67,8 +67,8 @@ pake http://127.0.0.1:3080/ --name DeepSeekHarness --title "DeepSeek Harness" \
 
 3. 等约 10~25 分钟（首次编译较久，后续有缓存会快很多）。
    构建完成自动出现在仓库 **Releases** 页面，三平台安装包直接可下载：
-   - `DeepSeekHarness_*.dmg`（macOS，universal 双架构）
-   - `DeepSeekHarness.msi`（Windows，pake 3.x 默认仅 MSI）
+   - `DeepSeekHarness.dmg`（macOS，**universal 双架构**：Intel + Apple Silicon 一份通吃）
+   - `DeepSeekHarness_x64.msi` / `DeepSeekHarness_arm64.msi`（Windows x64 与 ARM64 原生）
    - `deepseek-harness_*.deb` + `.AppImage`（Linux）
 
 不想打 tag 时：到 Actions 页 → **Build & Release** → **Run workflow** 手动触发，
@@ -93,6 +93,16 @@ pake http://127.0.0.1:3080/ --name DeepSeekHarness --title "DeepSeek Harness" \
 - **pake 版本钉死**：`PAKE_VERSION: 3.15.6`，发版可复现；升级只需改这一个变量。
 - **Linux 包名**：pake 会自动把 `DeepSeekHarness` 转成合法的 `deepseek-harness`，无需处理。
 - **release 发布**：`softprops/action-gh-release`，仅 tag 触发时执行，支持覆盖更新。
+
+### 平台与架构覆盖
+
+| 平台 | 架构 | 说明 |
+|---|---|---|
+| macOS | **x86_64 + arm64（universal）** | `--multi-arch` 一份 dmg 同时支持 Intel 与 Apple Silicon 芯片（已用 lipo 实测验证) |
+| Windows | **x86_64 + aarch64** | `x64.msi` 全 Windows 可用；`arm64.msi` 为骁龙/ARM 版 Windows 原生包（尽力而为构建） |
+| Linux | x86_64（deb / AppImage） | 另有 `deb-arm64` 等目标可选（见 Pake 文档），跨架构编译需 arm64 依赖，留作后续 |
+
+注：命令行本地打包时，Windows 用 `--targets x64` 或 `--targets arm64` 控制架构；macOS 默认打本机架构，加 `--multi-arch` 打 universal。
 
 ### 可调参数
 
