@@ -133,7 +133,6 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "node_modules/pake-cli/src-tauri -> target"
-          sharedKey: "dsh-pake-${{ runner.os }}"
 
       # ---- 解析版本号：input 优先，否则取 tag（v1.0.0 -> 1.0.0），默认 0.1.0 ----
       - name: Prepare env
@@ -191,11 +190,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $args = @($env:APP_URL, "--name", $env:APP_NAME, "--title", $env:APP_TITLE, `
-                    "--identifier", $env:APP_IDENTIFIER, "--icon", "assets/icon.png", `
-                    "--width", "1280", "--height", "800", "--app-version", $env:APP_VERSION, `
-                    "--targets", "x64")
-          npx --no-install pake @args
+          # 注意：不要用 $args 变量名（PowerShell 只读自动变量，赋值会静默失败导致参数为空）
+          & npx --no-install pake "$env:APP_URL" --name "$env:APP_NAME" --title "$env:APP_TITLE" `
+            --identifier "$env:APP_IDENTIFIER" --icon "assets/icon.png" `
+            --width 1280 --height 800 --app-version "$env:APP_VERSION" --targets x64
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
