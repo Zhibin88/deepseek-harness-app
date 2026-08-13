@@ -10,6 +10,31 @@ dsh 的网页端不是静态网站（需要 dsh 服务注入启动数据），**
 - 自己的电脑用：先 `dsh web`，再打开 App（对应下面的"本地打包"）。
 - 分发给别人用：别人的电脑也要装 dsh 并启动它 —— 如果希望"装完即用"，见文末【进阶：把 dsh 服务打进安装包】。
 
+## 安装 DeepSeek Harness 本体（`dsh`）
+
+桌面壳只是"窗户"，先装好"服务" dsh 本体才看得见风景。
+
+- **原仓库**：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness 官方仓库，迭代很快的 developer preview）
+- 安装方式（任选其一，需要 Node.js）：
+
+```bash
+# 方式一：不安装，直接跑（官方推荐；npx 会自动拉取最新版）
+npx @deepseek-ai/dsh web
+
+# 方式二：全局安装后运行（适合经常用）
+npm install -g @deepseek-ai/dsh        # 或 pnpm add -g @deepseek-ai/dsh
+dsh web
+
+# 方式三：从源码跑
+git clone https://github.com/deepseek-ai/deepseek-harness.git
+cd deepseek-harness && pnpm install && pnpm run build
+pnpm dsh web
+```
+
+启动后服务地址：http://127.0.0.1:3080（默认）。确认 `curl http://127.0.0.1:3080/` 有响应，
+再打开桌面 App 即可。升级/反馈/插件生态请看原仓库的
+[GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)。
+
 ## 目录结构
 
 ```
@@ -224,3 +249,9 @@ scripts/fetch-dsh.sh  # CI 步骤：下载对应平台 dsh 二进制
 ## License
 
 MIT（本项目仅为 Pake 打包编排模板；dsh 本体版权归其作者所有）。
+
+---
+
+## Friendship Link
+
+Thanks for the support and feedback from the friends at LINUX DO. https://linux.do/
