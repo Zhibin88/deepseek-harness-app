@@ -145,7 +145,7 @@ jobs:
           echo "APP_VERSION=${V:-0.1.0}" >> "$GITHUB_ENV"
           echo "APP_URL=${{ inputs.url || 'http://127.0.0.1:3080/' }}" >> "$GITHUB_ENV"
           echo "LINUX_TARGETS=${{ inputs.linux_targets || 'deb,appimage' }}" >> "$GITHUB_ENV"
-          echo "MULTI_ARCH=${{ inputs.multi_arch && 'true' || 'false' }}" >> "$GITHUB_ENV"
+          echo "MULTI_ARCH=${{ inputs.multi_arch || 'true' }}" >> "$GITHUB_ENV"
 
       # ---- 可选：macOS 签名 + 公证 ----
       # tauri-bundler 原生读取 APPLE_* 环境变量（APPLE_CERTIFICATE 为 base64 的 .p12 +
