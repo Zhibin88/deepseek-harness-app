@@ -153,7 +153,7 @@ jobs:
       # 无需修改任何配置文件。不配置 secrets 则跳过：产物为 ad-hoc 签名，
       # 用户首次打开时需右键 -> 打开（或 xattr -cr），这是分发前强烈建议补上的。
       - name: Configure macOS signing env
-        if: runner.os == 'macOS' && secrets.MACOS_CERT_P12 != ''
+        if: runner.os == 'macOS'
         env:
           MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
           MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
@@ -161,6 +161,11 @@ jobs:
           MACOS_NOTARIZE_TEAM_ID: ${{ secrets.MACOS_NOTARIZE_TEAM_ID }}
           MACOS_NOTARIZE_PASSWORD: ${{ secrets.MACOS_NOTARIZE_PASSWORD }}
         run: |
+          # secrets 只在脚本内判断可用性（step 级 if: 不允许访问 secrets context）
+          if [ -z "$MACOS_CERT_P12" ]; then
+            echo "::notice::未配置 MACOS_CERT_P12，跳过签名（产物为 ad-hoc 签名）"
+            exit 0
+          fi
           echo "APPLE_CERTIFICATE=$MACOS_CERT_P12" >> "$GITHUB_ENV"
           echo "APPLE_CERTIFICATE_PASSWORD=$MACOS_CERT_PASSWORD" >> "$GITHUB_ENV"
           if [ -n "$MACOS_NOTARIZE_APPLE_ID" ] && [ -n "$MACOS_NOTARIZE_PASSWORD" ]; then
@@ -236,5 +241,5 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: ${{ inputs.prerelease }}
-          overwrite: true
+          overwrite_files: true
           fail_on_unmatched_files: false
