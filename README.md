@@ -2,6 +2,10 @@
 
 把 DeepSeek Harness 网页端（`dsh web`，http://127.0.0.1:3080）用 [Pake](https://github.com/tw93/Pake)（Rust/Tauri）打包成 Windows / macOS / Linux 三平台桌面 App，并用 GitHub Actions 自动构建、发布到 GitHub Releases，方便任何人直接下载安装包。
 
+## 效果图 
+![alt text](image.png)
+
+![alt text](image-1.png)
 ## ⚠️ 先理解原理（重要）
 
 这个 App 是"网页外壳"：它把 `http://127.0.0.1:3080` 这个地址包装成原生窗口。
