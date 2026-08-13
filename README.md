@@ -1,6 +1,18 @@
 # DeepSeek Harness Desktop
 
-把 DeepSeek Harness 网页端（`dsh web`，http://127.0.0.1:3080）用 [Pake](https://github.com/tw93/Pake)（Rust/Tauri）打包成 Windows / macOS / Linux 三平台桌面 App，并用 GitHub Actions 自动构建、发布到 GitHub Releases，方便任何人直接下载安装包。
+把 DeepSeek Harness 网页端 `dsh web`，http://127.0.0.1:3080 用 [Pake](https://github.com/tw93/Pake)（Rust/Tauri）打包成 Windows / macOS / Linux 三平台桌面 App，并用 GitHub Actions 自动构建、发布到 GitHub Releases，方便任何人直接下载安装包。
+
+<p align="center">
+  <a href="https://github.com/ipfred/deepseek-harness-app/releases/latest">
+    <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F_%E4%B8%8B%E8%BD%BD%E5%AE%89%E8%A3%85%E5%8C%85-GitHub_Release-4D6BFE?style=for-the-badge&logo=github&logoColor=white" alt="下载安装包"/>
+  </a>
+  <a href="https://github.com/ipfred/deepseek-harness-app/releases/latest">
+    <img src="https://img.shields.io/github/v/release/ipfred/deepseek-harness-app?style=for-the-badge&label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC&color=28a745" alt="最新版本"/>
+  </a>
+  <a href="https://github.com/ipfred/deepseek-harness-app/releases/latest">
+    <img src="https://img.shields.io/github/downloads/ipfred/deepseek-harness-app/total?style=for-the-badge&label=%E6%80%BB%E4%B8%8B%E8%BD%BD%E9%87%8F&color=28a745" alt="总下载量"/>
+  </a>
+</p>
 
 ## 效果图 
 ![alt text](image.png)
@@ -258,4 +270,4 @@ MIT（本项目仅为 Pake 打包编排模板；dsh 本体版权归其作者所�
 
 ## Friendship Link
 
-Thanks for the support and feedback from the friends at LINUX DO. https://linux.do/
+Thanks for the support and feedback from the friends at [LINUX DO](https://linux.do/). 
