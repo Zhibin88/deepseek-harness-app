@@ -7,7 +7,7 @@
 #
 # 产物：
 #   macOS  -> DeepSeekHarness.dmg        （默认 universal，同时支持 Intel/Apple Silicon）
-#   Windows-> DeepSeekHarness.msi + .exe（NSIS 安装包）
+#   Windows-> DeepSeekHarness.msi（pake 3.x 在 Windows 默认只产出 MSI）
 #   Linux  -> .deb + .AppImage（+ .rpm，可通过 input 调整）
 # =============================================================================
 name: Build & Release
@@ -206,17 +206,25 @@ jobs:
 
       # ================= 收集产物到 dist/ =================
       # pake 成功后会把安装包从内置工程的 target 目录复制到工作区根目录，并清空 bundle 目录；
-      # 所以根目录和 target 目录都要搜。
+      # 所以根目录优先，target 只兜底搜索 release/bundle 下的安装包（绝不能全目录递归，
+      # 否则会把 Rust 编译中间产物如 build_script_build-*.exe 一并收集）。
       - name: Collect artifacts
         shell: bash
         run: |
           mkdir -p dist
-          # 1) 工作区根目录（pake 成功后的落点，也可能是目标目录被清空前的位置）
+          # 1) 工作区根目录（pake 成功后的落点）
           cp -f ./*.dmg ./*.msi ./*.exe ./*.deb ./*.AppImage ./*.rpm dist/ 2>/dev/null || true
-          # 2) pake 内置工程的 target 目录（兜底）
+          # 2) 兜底：只找 target/**/release/bundle/ 下的安装包
           PK="node_modules/pake-cli/src-tauri/target"
           if [ -d "$PK" ]; then
-            find "$PK" \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.rpm" \) -exec cp -f {} dist/ \; 2>/dev/null || true
+            find "$PK" \( \
+              -path "*release/bundle/dmg/*.dmg" \
+              -o -path "*release/bundle/msi/*.msi" \
+              -o -path "*release/bundle/nsis/*.exe" \
+              -o -path "*release/bundle/deb/*.deb" \
+              -o -path "*release/bundle/appimage/*.AppImage" \
+              -o -path "*release/bundle/rpm/*.rpm" \
+            \) -exec cp -f {} dist/ \; 2>/dev/null || true
           fi
           echo "---- dist/ ----"
           ls -la dist/ 2>/dev/null || true

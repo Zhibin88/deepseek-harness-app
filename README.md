@@ -41,7 +41,7 @@ dsh web
 
 # 4. 安装：产物在当前目录
 #    macOS  双击 DeepSeekHarness_*.dmg
-#    Windows 双击 DeepSeekHarness.msi / .exe
+#    Windows 双击 DeepSeekHarness.msi
 #    Linux  sudo dpkg -i deepseek-harness_*.deb  或 运行 *.AppImage
 ```
 
@@ -68,7 +68,7 @@ pake http://127.0.0.1:3080/ --name DeepSeekHarness --title "DeepSeek Harness" \
 3. 等约 10~25 分钟（首次编译较久，后续有缓存会快很多）。
    构建完成自动出现在仓库 **Releases** 页面，三平台安装包直接可下载：
    - `DeepSeekHarness_*.dmg`（macOS，universal 双架构）
-   - `DeepSeekHarness.msi / .exe`（Windows）
+   - `DeepSeekHarness.msi`（Windows，pake 3.x 默认仅 MSI）
    - `deepseek-harness_*.deb` + `.AppImage`（Linux）
 
 不想打 tag 时：到 Actions 页 → **Build & Release** → **Run workflow** 手动触发，
