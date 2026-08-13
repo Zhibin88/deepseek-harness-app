@@ -69,12 +69,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm + Node.js
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: false
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -113,22 +107,31 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $wix = "$env:ProgramFiles(x86)\WiX Toolset v3.11"
+          $wix = "${env:ProgramFiles(x86)}\WiX Toolset v3.11"
           if (-not (Test-Path "$wix\bin\candle.exe")) {
             Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311.exe" -OutFile "$env:RUNNER_TEMP\wix311.exe"
             Start-Process -FilePath "$env:RUNNER_TEMP\wix311.exe" -ArgumentList "/quiet" -Wait
           }
           echo "$wix\bin" | Out-File -Append -Encoding ascii $env:GITHUB_PATH
 
-      # ---- 安装 pake-cli（npm 全局装在 Windows runner 上 PATH 处理最稳）----
-      - name: Install pake-cli
-        run: npm install -g pake-cli@${{ env.PAKE_VERSION }}
+      # ---- 安装 pake-cli：装到工作区 node_modules（而非全局）----
+      # pake 3.x 使用自身内置的 Tauri 工程编译（node_modules/pake-cli/src-tauri），
+      # 装在工作区内才能让 rust-cache 命中并持久化编译产物：二次构建从 ~20min 降到 2-3min。
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-pake-${{ env.PAKE_VERSION }}
 
-      # ---- Rust 编译缓存：同一 pake 版本 -> 依赖一致 -> 缓存长期命中，二次构建从 20min 降到 2min ----
+      - name: Install pake-cli
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-audit --no-fund pake-cli@${{ env.PAKE_VERSION }}
+
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "src-tauri -> target"
+          workspaces: "node_modules/pake-cli/src-tauri -> target"
           sharedKey: "dsh-pake-${{ runner.os }}"
 
       # ---- 解析版本号：input 优先，否则取 tag（v1.0.0 -> 1.0.0），默认 0.1.0 ----
@@ -176,7 +179,7 @@ jobs:
                 --identifier "$APP_IDENTIFIER" --icon assets/icon.png \
                 --width 1280 --height 800 --app-version "$APP_VERSION")
           if [ "$MULTI_ARCH" = "true" ]; then ARGS+=(--multi-arch); fi
-          pake "${ARGS[@]}"
+          npx --no-install pake "${ARGS[@]}"
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
@@ -186,7 +189,7 @@ jobs:
                     "--identifier", $env:APP_IDENTIFIER, "--icon", "assets/icon.png", `
                     "--width", "1280", "--height", "800", "--app-version", $env:APP_VERSION, `
                     "--targets", "x64")
-          pake @args
+          npx --no-install pake @args
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
@@ -195,28 +198,23 @@ jobs:
                 --identifier "$APP_IDENTIFIER" --icon assets/icon.png \
                 --width 1280 --height 800 --app-version "$APP_VERSION" \
                 --targets "$LINUX_TARGETS")
-          pake "${ARGS[@]}"
+          npx --no-install pake "${ARGS[@]}"
 
-      # ================= 收集产物到 dist/（pake 生成物可能在项目根或 target bundle 目录下） =================
+      # ================= 收集产物到 dist/（pake 3.x 的产物留在其内置工程的 target 目录下） =================
       - name: Collect artifacts
         shell: bash
         run: |
+          PK="node_modules/pake-cli/src-tauri/target"
           mkdir -p dist
           if [ "$RUNNER_OS" = "macOS" ]; then
-            cp -f *.dmg dist/ 2>/dev/null || true
-            cp -f src-tauri/target/*/release/bundle/dmg/*.dmg dist/ 2>/dev/null || true
+            find "$PK" -name "*.dmg" -exec cp -f {} dist/ \; 2>/dev/null || true
           elif [ "$RUNNER_OS" = "Windows" ]; then
-            cp -f *.msi *.exe dist/ 2>/dev/null || true
-            cp -f src-tauri/target/*/release/bundle/msi/*.msi dist/ 2>/dev/null || true
-            cp -f src-tauri/target/*/release/bundle/nsis/*.exe dist/ 2>/dev/null || true
+            find "$PK" \( -name "*.msi" -o -name "*.exe" \) -exec cp -f {} dist/ \; 2>/dev/null || true
           else
-            cp -f *.deb *.AppImage *.rpm dist/ 2>/dev/null || true
-            cp -f src-tauri/target/*/release/bundle/deb/*.deb dist/ 2>/dev/null || true
-            cp -f src-tauri/target/*/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || true
-            cp -f src-tauri/target/*/release/bundle/rpm/*.rpm dist/ 2>/dev/null || true
+            find "$PK" \( -name "*.deb" -o -name "*.AppImage" -o -name "*.rpm" \) -exec cp -f {} dist/ \; 2>/dev/null || true
           fi
           echo "---- dist/ ----"
-          ls -la dist/
+          ls -la dist/ 2>/dev/null || true
 
       # ---- macOS 公证由 tauri-bundler 在上一步构建时原生完成（检测到 APPLE_* 环境变量即执行，
       #      无需单独步骤）----
