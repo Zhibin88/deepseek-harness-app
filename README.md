@@ -314,6 +314,17 @@ src-tauri/            # 提交自定义的 Tauri 工程（含 sidecar 逻辑）
 scripts/fetch-dsh.sh  # CI 步骤：下载对应平台 dsh 二进制
 ```
 
+## 推荐插件 / 资源
+
+DeepSeek Harness 有活跃的插件生态，以下是一些不错的资源（持续更新）：
+
+| 名称 | 地址 | 说明 |
+|---|---|---|
+| 插件市场 | https://awesome-dsh-plugin.com/ | DSH 插件聚合市场，浏览 / 搜索社区插件 |
+| dsh-web-ui | https://github.com/zhu1090093659/dsh-web-ui | DSH Web UI 插件全家桶（SSH / 任务看板 / 右侧面板等） |
+
+> 发现新的好插件会陆续补充到此表。
+
 ## License
 
 MIT（本项目仅为 Pake 打包编排模板；dsh 本体版权归其作者所有）。
