@@ -14,6 +14,9 @@
  *    外部 <a> 点击，通过 tauri-plugin-shell 的 plugin:shell|open 在系统浏览器打开。
  *  - 本脚本做「第二层兜底」：补上 event.js 覆盖不到的 JS 直跳
  *    （location.assign / location.replace），并在内置拦截失效时兜住 <a> 与 window.open。
+ *  - 「内部地址」= 只有桌面 App 主入口本身（与当前页同源，即 http://127.0.0.1:3080）
+ *    允许在窗口内打开（dsh 自身页面/路由必需）。其他任何本地端口
+ *    （如 http://127.0.0.1:5173、localhost:xxxx）与外网地址一样，一律由系统默认浏览器打开。
  *  - 已知边界：window.location.href = xxx 这类赋值无法在网页侧拦截
  *    （Location.prototype.href 在 Chromium/WebKit 中不可重定义）。
  *    若未来 dsh 出现对 location.href 的外部直跳，唯一彻底的方案是在自建
@@ -21,31 +24,39 @@
  */
 (function () {
   "use strict";
+  var TAG = "[dsh-ext]";
   try {
     var tauri = window.__TAURI__;
     // 只在 Tauri/Pake 环境中生效；普通浏览器无需任何处理
-    if (!tauri || !tauri.core || !tauri.core.invoke) return;
+    if (!tauri || !tauri.core || !tauri.core.invoke) {
+      console.warn(TAG, "未检测到 Tauri 环境，脚本不生效（window.__TAURI__=", tauri, ")");
+      return;
+    }
+    console.log(TAG, "外部链接拦截脚本已加载，当前 origin =", window.location.origin);
 
     var invoke = tauri.core.invoke;
 
-    // App 内地址：本机 dsh web 服务（回环地址或与当前页同 host）。其余 http(s) 一律视为外部
-    var LOOPBACK = new Set(["127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0"]);
-
-    function isInternal(url) {
+    // 是否应交给系统默认浏览器：
+    //  - 非 http(s) 协议（mailto:/tel:/data:/blob: 等）不拦，保持默认行为；
+    //  - http(s) 且与主入口不同源 → 外部浏览器（含其他本地端口，如 127.0.0.1:5173）。
+    // 与当前页同源（http://127.0.0.1:3080）的相对/绝对地址仍留在 App 窗口内。
+    function shouldOpenExternally(url) {
       try {
         var u = new URL(url, window.location.href);
-        // 非网页协议（mailto:/tel:/data:/blob: 等）不拦
-        if (u.protocol !== "http:" && u.protocol !== "https:") return true;
-        if (u.hostname === window.location.hostname) return true;
-        return LOOPBACK.has(u.hostname);
+        if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+        var ext = u.origin !== window.location.origin;
+        console.log(TAG, "判定", url, "→ external=" + ext, "(linkOrigin=" + u.origin + ", appOrigin=" + window.location.origin + ")");
+        return ext;
       } catch (_) {
-        return true; // 解析失败按内部处理，避免误伤
+        console.warn(TAG, "URL 解析失败，不拦:", url);
+        return false; // 解析失败不拦，避免误伤
       }
     }
 
     function openExternal(url) {
+      console.log(TAG, "→ 调用系统浏览器打开:", url);
       invoke("plugin:shell|open", { path: url }).catch(function (err) {
-        console.error("[dsh-app] 打开外部浏览器失败:", url, err);
+        console.error(TAG, "打开外部浏览器失败:", url, err);
       });
     }
 
@@ -58,7 +69,9 @@
         if (!e.target || typeof e.target.closest !== "function") return;
         var a = e.target.closest("a");
         if (!a || !a.href || a.hasAttribute("download")) return;
-        if (isInternal(a.href)) return;
+        console.log(TAG, "click 捕获:", a.href, "target=" + (a.target || "(none)"));
+        if (!shouldOpenExternally(a.href)) return;
+        console.log(TAG, "click 拦截 → 外部浏览器:", a.href);
         e.preventDefault();
         e.stopPropagation();
         openExternal(a.href);
@@ -66,11 +79,11 @@
       true
     );
 
-    // 2) window.open 兜底（event.js 已在前面包了一层，这里是外层，内部地址仍走原逻辑）
+    // 2) window.open 兜底（event.js 已在前面包了一层，这里是外层，同源地址仍走原逻辑）
     var nativeOpen = window.open.bind(window);
     window.open = function (url, name, features) {
       try {
-        if (url && !isInternal(url)) {
+        if (url && shouldOpenExternally(url)) {
           openExternal(String(url));
           return null;
         }
@@ -88,7 +101,7 @@
         if (typeof nativeFn !== "function") return;
         var override = function (url) {
           try {
-            if (url && !isInternal(url)) {
+            if (url && shouldOpenExternally(url)) {
               openExternal(String(url));
               return;
             }
