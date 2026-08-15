@@ -19,6 +19,9 @@ if ! command -v pake >/dev/null 2>&1; then
 fi
 pake --version 2>/dev/null | head -1 || pake --version
 
+echo "    [1/3+] 补丁 pake capability（放行 http 本地服务调用 shell.open）"
+node "$ROOT/scripts/patch-pake-capability.js"
+
 echo "==> [2/3] 确保 dsh web 已启动 ($APP_URL)"
 if ! curl -sf --max-time 2 "$APP_URL" >/dev/null 2>&1; then
   echo "    dsh web 未运行，正在后台启动: $DSH_CMD ..."

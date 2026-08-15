@@ -60,6 +60,7 @@ deepseek-harness-app/
 ├── scripts/
 │   ├── build-locally.sh          # 本地一键打包
 │   ├── external-links.js         # 注入脚本：外部链接一律用系统默认浏览器打开（防窗口被覆盖）
+│   ├── patch-pake-capability.js  # 构建前置：放行 http 本地服务调用 shell.open（修 Tauri v2 scope）
 │   └── make-icon.py              # 图标生成脚本（可选）
 ├── .gitignore
 └── README.md
@@ -190,24 +191,28 @@ Windows 签名可在此基础上加一个 `signtool` 步骤（需要证书），
 ## 四、常见问题
 
 <details>
-<summary><b>页面上点外链，为什么把 App 窗口整个覆盖掉了？能不能默认用系统浏览器打开？</b></summary>
+<summary><b>页面上点链接，能不能默认用系统浏览器打开？为什么有时把 App 窗口整个覆盖掉 / 点了没反应？</b></summary>
 
-**能，而且默认就是（新版本）**。dsh 网页端所有外链都带 `target="_blank"`，
-Pake 3.13+ 内置脚本会拦截这类点击并通过系统默认浏览器打开，不会在窗口内跳转。
+**可以，且本仓库已配好。** 规则：只有与 App 主入口同源（`http://127.0.0.1:3080` 及其路由）的地址留在 App 窗口内；其它任何本地端口（如 `http://127.0.0.1:5173`、`localhost:xxxx`）与外网地址一视同仁，一律交给系统默认浏览器。
 
-如果你装的旧安装包还是"点链接就把窗口覆盖掉"，通常是 **pake 版本太旧**
-（旧版没有外链拦截逻辑）。解决办法：
+实现上有两层，缺一不可：
 
-1. 用本仓库当前配置**重新打包**（本地 `./scripts/build-locally.sh` 或重新下载
-   GitHub Releases 最新安装包）——CI 固定 `pake@3.15.6`，自带外链拦截。
-2. 本仓库同时通过 `--inject scripts/external-links.js` 注入了**第二层兜底**：
-   外部 `<a>` 点击、`window.open`、`location.assign/replace` 都会改走系统浏览器；
-   只有 `127.0.0.1`/`localhost` 等本机地址仍在 App 内打开（这是 dsh 自身页面所必需的）。
-3. 已知边界：页面代码里 `window.location.href = 外链` 这种赋值无法在网页侧拦截，
-   彻底方案是自建 `src-tauri` 在 Rust `on_navigation` 层做白名单拦截（见【进阶】）。
+1. **注入拦截脚本** `--inject scripts/external-links.js`：在 `<a>` 点击、`window.open`、`location.assign/replace` 三处拦截，不同源的 http(s) 地址改走 `plugin:shell|open`。
+2. **放行 capability**（`scripts/patch-pake-capability.js`，构建前自动执行，幂等）：
+   把 pake 模板 `capabilities/default.json` 的 `remote.urls` 加上 `http://*:*`。
 
-验证方法：点任意外链（如消息里的 GitHub 链接），应在系统默认浏览器新开标签页，
+   **为什么必须这一步？** Tauri v2 的 `shell:allow-open` 自带 URL scope，默认只允许
+   `[URL: local]` 和 `[URL: https://*.*]` 的页面调用 `shell.open`。而我们的 App 页面是
+   `http://127.0.0.1:3080`（http 明文本地服务），不在 scope 内，`shell.open` 会被直接拒绝
+   —— 不光本仓库的注入脚本打不开外链，**连 pake 内置的外链拦截也会失效**。所以任何
+   用 Pake 打包 http 本地服务的场景都需要这个 patch。
+
+**验证方法**：点一个 `http://127.0.0.1:5173` 或外网链接，应在系统默认浏览器新开标签页，
 App 窗口保持不动。
+
+**已知边界**：页面代码里 `window.location.href = 外链` 这种赋值无法在网页侧拦截
+（`Location.prototype.href` 不可重定义）。若未来 dsh 出现这类直跳，彻底方案是自建
+`src-tauri` 在 Rust `on_navigation` 层做白名单拦截（见【进阶】）。
 </details>
 
 <details>

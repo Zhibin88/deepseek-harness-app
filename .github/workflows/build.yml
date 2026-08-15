@@ -129,6 +129,10 @@ jobs:
           npm init -y >/dev/null 2>&1 || true
           npm install --no-audit --no-fund pake-cli@${{ env.PAKE_VERSION }}
 
+      - name: Patch pake capability (allow http local service to call shell.open)
+        shell: bash
+        run: node scripts/patch-pake-capability.js
+
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
         with:

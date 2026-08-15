@@ -9,69 +9,63 @@
  * pake 会把本文件合并进它内置模板的 inject/custom.js，
  * 并在 DOMContentLoaded 之后执行（晚于 pake 内置的 event.js）。
  *
- * 说明：
- *  - pake 3.13+ 内置的 event.js 已经拦截了 <a target="_blank">、window.open、
- *    外部 <a> 点击，通过 tauri-plugin-shell 的 plugin:shell|open 在系统浏览器打开。
- *  - 本脚本做「第二层兜底」：补上 event.js 覆盖不到的 JS 直跳
- *    （location.assign / location.replace），并在内置拦截失效时兜住 <a> 与 window.open。
- *  - 「内部地址」= 只有桌面 App 主入口本身（与当前页同源，即 http://127.0.0.1:3080）
- *    允许在窗口内打开（dsh 自身页面/路由必需）。其他任何本地端口
- *    （如 http://127.0.0.1:5173、localhost:xxxx）与外网地址一样，一律由系统默认浏览器打开。
- *  - 已知边界：window.location.href = xxx 这类赋值无法在网页侧拦截
- *    （Location.prototype.href 在 Chromium/WebKit 中不可重定义）。
- *    若未来 dsh 出现对 location.href 的外部直跳，唯一彻底的方案是在自建
- *    src-tauri 的 Rust on_navigation 层做白名单拦截（见 README「进阶」）。
+ * 行为规则：
+ *  - 与当前页同源（http://127.0.0.1:3080 及其路由）→ 留在 App 窗口内（dsh 自身页面必需）。
+ *  - 其余任何 http(s) 地址（含其他本地端口，如 127.0.0.1:5173、localhost:xxxx，以及外网）
+ *    → 一律交给系统默认浏览器。
+ *  - 非 http(s) 协议（mailto:/tel:/data:/blob: 等）保持浏览器默认行为，不拦截。
+ *
+ * 三层拦截：
+ *  1) <a> 点击（capture 兜底；pake 内置 event.js 先跑，外链已被它处理并 stopImmediatePropagation，
+ *     本层主要兜住 event.js 漏掉的情况，例如 pake 默认把同-host 不同-port 的本地链接判为
+ *     "内部"从而只在窗口内导航的情形）。
+ *  2) window.open（event.js 已包一层；本层为外层兜底）。
+ *  3) location.assign / location.replace（event.js 不覆盖，本层补上）。
+ *
+ * 前置依赖：构建前须执行 scripts/patch-pake-capability.js，把 pake 模板的
+ * capabilities/default.json 的 remote.urls 放行 http://*:*，否则 Tauri v2 的
+ * shell:allow-open 会拒绝从 http://127.0.0.1:3080 页面发起的 shell.open 调用。
+ *
+ * 已知边界：window.location.href = xxx 这类赋值无法在网页侧拦截（Location.prototype.href
+ * 在 Chromium/WebKit 中不可重定义）。若未来 dsh 出现对 location.href 的外部直跳，
+ * 彻底方案是在自建 src-tauri 的 Rust on_navigation 层做白名单拦截（见 README「进阶」）。
  */
 (function () {
   "use strict";
-  var TAG = "[dsh-ext]";
   try {
     var tauri = window.__TAURI__;
     // 只在 Tauri/Pake 环境中生效；普通浏览器无需任何处理
-    if (!tauri || !tauri.core || !tauri.core.invoke) {
-      console.warn(TAG, "未检测到 Tauri 环境，脚本不生效（window.__TAURI__=", tauri, ")");
-      return;
-    }
-    console.log(TAG, "外部链接拦截脚本已加载，当前 origin =", window.location.origin);
+    if (!tauri || !tauri.core || !tauri.core.invoke) return;
 
     var invoke = tauri.core.invoke;
 
     // 是否应交给系统默认浏览器：
-    //  - 非 http(s) 协议（mailto:/tel:/data:/blob: 等）不拦，保持默认行为；
+    //  - 非 http(s) 协议不拦；
     //  - http(s) 且与主入口不同源 → 外部浏览器（含其他本地端口，如 127.0.0.1:5173）。
-    // 与当前页同源（http://127.0.0.1:3080）的相对/绝对地址仍留在 App 窗口内。
     function shouldOpenExternally(url) {
       try {
         var u = new URL(url, window.location.href);
         if (u.protocol !== "http:" && u.protocol !== "https:") return false;
-        var ext = u.origin !== window.location.origin;
-        console.log(TAG, "判定", url, "→ external=" + ext, "(linkOrigin=" + u.origin + ", appOrigin=" + window.location.origin + ")");
-        return ext;
+        return u.origin !== window.location.origin;
       } catch (_) {
-        console.warn(TAG, "URL 解析失败，不拦:", url);
         return false; // 解析失败不拦，避免误伤
       }
     }
 
     function openExternal(url) {
-      console.log(TAG, "→ 调用系统浏览器打开:", url);
       invoke("plugin:shell|open", { path: url }).catch(function (err) {
-        console.error(TAG, "打开外部浏览器失败:", url, err);
+        console.error("[dsh-app] 打开外部浏览器失败:", url, err);
       });
     }
 
-    // 1) <a> 点击兜底。
-    //    event.js 已处理过的外链会 preventDefault + stopImmediatePropagation，
-    //    这里只会收到它漏掉的（仅作保险，防止未来 pake 版本行为变化）。
+    // 1) <a> 点击兜底
     document.addEventListener(
       "click",
       function (e) {
         if (!e.target || typeof e.target.closest !== "function") return;
         var a = e.target.closest("a");
         if (!a || !a.href || a.hasAttribute("download")) return;
-        console.log(TAG, "click 捕获:", a.href, "target=" + (a.target || "(none)"));
         if (!shouldOpenExternally(a.href)) return;
-        console.log(TAG, "click 拦截 → 外部浏览器:", a.href);
         e.preventDefault();
         e.stopPropagation();
         openExternal(a.href);
@@ -79,7 +73,7 @@
       true
     );
 
-    // 2) window.open 兜底（event.js 已在前面包了一层，这里是外层，同源地址仍走原逻辑）
+    // 2) window.open 兜底
     var nativeOpen = window.open.bind(window);
     window.open = function (url, name, features) {
       try {
@@ -93,8 +87,7 @@
       return nativeOpen(url, name, features);
     };
 
-    // 3) JS 直跳兜底：location.assign / location.replace 指向外部地址时改走系统浏览器。
-    //    用 defineProperty 覆盖实例方法（部分引擎对 window.location 的直接赋值静默失败）。
+    // 3) location.assign / location.replace 直跳兜底
     ["assign", "replace"].forEach(function (method) {
       try {
         var nativeFn = window.location[method];
