@@ -60,6 +60,7 @@ deepseek-harness-app/
 ├── scripts/
 │   ├── build-locally.sh          # 本地一键打包
 │   ├── external-links.js         # 注入脚本：外部链接一律用系统默认浏览器打开（防窗口被覆盖）
+│   ├── check-update.js           # 注入脚本：检测桌面壳新版本，提示用系统浏览器去下载
 │   ├── patch-pake-capability.js  # 构建前置：放行 http 本地服务调用 shell.open（修 Tauri v2 scope）
 │   └── make-icon.py              # 图标生成脚本（可选）
 ├── .gitignore
@@ -122,8 +123,8 @@ pake http://127.0.0.1:3080/ --name DeepSeekHarness --title "DeepSeek Harness" \
 
 | 触发 | 效果 |
 |---|---|
-| `git push origin v*` | 自动构建 + 生成 Release（版本号取 tag，去掉 `v`） |
-| 手动 Run workflow | 只构建 + 上传 artifacts，不发布 Release（除非打了 tag） |
+| `git push origin v*` | 自动构建 + 上传到 GitHub Release **草稿**（版本号取 tag，去掉 `v`）；你在 Releases 页确认后手动点 Publish 上线 |
+| 手动 Run workflow | 只构建 + 上传 artifacts，不创建 Release（除非打了 tag） |
 
 ### 工作流设计要点
 
@@ -255,8 +256,31 @@ AppImage 需要 FUSE：`chmod +x xxx.AppImage && ./xxx.AppImage`；
 <details>
 <summary><b>新版本 dsh 怎么出包？</b></summary>
 
-`git tag v1.1.0 && git push origin v1.1.0`，Release 会自动生成新版本；升级 pake 就改
+`git tag v1.1.0 && git push origin v1.1.0`，CI 会自动构建并把安装包上传到 GitHub Release
+**草稿箱**；你到 Releases 页确认无误后手动点 "Publish release" 上线。升级 pake 就改
 `PAKE_VERSION` 后重打一个 tag。
+</details>
+
+<details>
+<summary><b>桌面壳有"检查更新"吗？怎么通知用户？</b></summary>
+
+有（方案 A：提示 + 手动下载）。打包时通过 `--inject scripts/check-update.js` 注入了一段轻量
+脚本，行为：
+
+- App 启动时静默调用 GitHub Releases API（`releases/latest`）拉最新已发布 tag，与本地
+  localStorage 记的"已知晓 tag"比对。**有更新的 tag** 才在右上角弹一个小卡片：
+  `桌面壳有新版本 vX.Y.Z  [前往下载] [×]`。
+- 点 `[前往下载]` → 用系统默认浏览器打开该 Release 页面（复用外链拦截的 `plugin:shell|open`），
+  你手动下载新安装包覆盖安装即可；同时该 tag 记为"已知晓"、卡片关闭。
+- 点 `[×]` 同样记为已知晓、暂不提醒，直到下一次出现更新的 tag。
+- 无新版 / 网络失败 / 被 CSP 拦截 → **静默，完全不打扰**。每 6 小时在同一会话内复查一次。
+- 首次运行以当前 latest 为基线、不弹提示。
+
+注意：GitHub API 的 `releases/latest` **只返回已正式 Publish 的 Release**，草稿不算。
+所以 CI 改成"先存草稿、手动 publish"后，只有你 publish 出去的版本才会被桌面壳检测到。
+
+> dsh 服务本体的升级不走这条线：直接 `npm i -g @deepseek-ai/dsh@latest`（或 `npx` 每次拉最新）
+> 即可，**不用换安装包**。本机制只针对"Pake 壳本身"出新版（如改了图标 / 窗口 / 注入脚本等）。
 </details>
 
 ## 五、进阶：把 dsh 服务打进安装包（开箱即用）
