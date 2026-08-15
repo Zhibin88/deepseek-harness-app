@@ -40,7 +40,8 @@ TAURI_BUNDLER_DMG_IGNORE_CI="${TAURI_BUNDLER_DMG_IGNORE_CI:-true}" pake "$APP_UR
   --identifier com.deepseekharness.app \
   --icon assets/icon.png \
   --width 1280 --height 800 \
-  --app-version "$APP_VERSION"
+  --app-version "$APP_VERSION" \
+  --inject scripts/external-links.js
 
 echo ""
 echo "==> 完成！安装包已生成到项目根目录："

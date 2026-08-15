@@ -59,6 +59,7 @@ deepseek-harness-app/
 ├── assets/icon.png               # 应用图标（1024x1024，可替换）
 ├── scripts/
 │   ├── build-locally.sh          # 本地一键打包
+│   ├── external-links.js         # 注入脚本：外部链接一律用系统默认浏览器打开（防窗口被覆盖）
 │   └── make-icon.py              # 图标生成脚本（可选）
 ├── .gitignore
 └── README.md
@@ -91,7 +92,8 @@ dsh web
 ```bash
 pake http://127.0.0.1:3080/ --name DeepSeekHarness --title "DeepSeek Harness" \
      --identifier com.deepseekharness.app --icon assets/icon.png \
-     --width 1280 --height 800 --app-version 0.1.0
+     --width 1280 --height 800 --app-version 0.1.0 \
+     --inject scripts/external-links.js
 ```
 
 ## 二、GitHub Actions 自动打包 + 发布 （核心）
@@ -186,6 +188,27 @@ pake http://127.0.0.1:3080/ --name DeepSeekHarness --title "DeepSeek Harness" \
 Windows 签名可在此基础上加一个 `signtool` 步骤（需要证书），README 不展开。
 
 ## 四、常见问题
+
+<details>
+<summary><b>页面上点外链，为什么把 App 窗口整个覆盖掉了？能不能默认用系统浏览器打开？</b></summary>
+
+**能，而且默认就是（新版本）**。dsh 网页端所有外链都带 `target="_blank"`，
+Pake 3.13+ 内置脚本会拦截这类点击并通过系统默认浏览器打开，不会在窗口内跳转。
+
+如果你装的旧安装包还是"点链接就把窗口覆盖掉"，通常是 **pake 版本太旧**
+（旧版没有外链拦截逻辑）。解决办法：
+
+1. 用本仓库当前配置**重新打包**（本地 `./scripts/build-locally.sh` 或重新下载
+   GitHub Releases 最新安装包）——CI 固定 `pake@3.15.6`，自带外链拦截。
+2. 本仓库同时通过 `--inject scripts/external-links.js` 注入了**第二层兜底**：
+   外部 `<a>` 点击、`window.open`、`location.assign/replace` 都会改走系统浏览器；
+   只有 `127.0.0.1`/`localhost` 等本机地址仍在 App 内打开（这是 dsh 自身页面所必需的）。
+3. 已知边界：页面代码里 `window.location.href = 外链` 这种赋值无法在网页侧拦截，
+   彻底方案是自建 `src-tauri` 在 Rust `on_navigation` 层做白名单拦截（见【进阶】）。
+
+验证方法：点任意外链（如消息里的 GitHub 链接），应在系统默认浏览器新开标签页，
+App 窗口保持不动。
+</details>
 
 <details>
 <summary><b>macOS 打包时 DMG 失败（bundle_dmg.sh 报错）？</b></summary>
