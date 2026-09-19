@@ -187,7 +187,7 @@ jobs:
           ARGS=("$APP_URL" --name "$APP_NAME" --title "$APP_TITLE" \
                 --identifier "$APP_IDENTIFIER" --icon assets/icon.png \
                 --width 1280 --height 800 --app-version "$APP_VERSION" \
-                --inject scripts/external-links.js,scripts/check-update.js)
+                --inject scripts/external-links.js,scripts/check-update.js,scripts/auth-token.js)
           if [ "$MULTI_ARCH" = "true" ]; then ARGS+=(--multi-arch); fi
           npx --no-install pake "${ARGS[@]}"
 
@@ -200,7 +200,7 @@ jobs:
           & npx --no-install pake "$env:APP_URL" --name "$env:APP_NAME" --title "$env:APP_TITLE" `
             --identifier "$env:APP_IDENTIFIER" --icon "assets/icon.png" `
             --width 1280 --height 800 --app-version "$env:APP_VERSION" --targets x64 `
-            --inject "scripts/external-links.js,scripts/check-update.js"
+            --inject "scripts/external-links.js,scripts/check-update.js,scripts/auth-token.js"
           # pake 会把安装包复制到工作区根目录；马上改名移进 dist，避免被下一次构建覆盖
           if (Test-Path "$env:APP_NAME.msi") { Move-Item "$env:APP_NAME.msi" "dist/${env:APP_NAME}_x64.msi" -Force }
 
@@ -213,7 +213,7 @@ jobs:
           & npx --no-install pake "$env:APP_URL" --name "$env:APP_NAME" --title "$env:APP_TITLE" `
             --identifier "$env:APP_IDENTIFIER" --icon "assets/icon.png" `
             --width 1280 --height 800 --app-version "$env:APP_VERSION" --targets arm64 `
-            --inject "scripts/external-links.js,scripts/check-update.js"
+            --inject "scripts/external-links.js,scripts/check-update.js,scripts/auth-token.js"
           if (Test-Path "$env:APP_NAME.msi") { Move-Item "$env:APP_NAME.msi" "dist/${env:APP_NAME}_arm64.msi" -Force }
 
       - name: Build (Linux)
@@ -222,7 +222,7 @@ jobs:
           ARGS=("$APP_URL" --name "$APP_NAME" --title "$APP_TITLE" \
                 --identifier "$APP_IDENTIFIER" --icon assets/icon.png \
                 --width 1280 --height 800 --app-version "$APP_VERSION" \
-                --targets "$LINUX_TARGETS" --inject scripts/external-links.js,scripts/check-update.js)
+                --targets "$LINUX_TARGETS" --inject scripts/external-links.js,scripts/check-update.js,scripts/auth-token.js)
           npx --no-install pake "${ARGS[@]}"
 
       # ================= 收集产物到 dist/ =================

@@ -26,6 +26,12 @@ dsh 的网页端不是静态网站（需要 dsh 服务注入启动数据），**
 - 自己的电脑用：先 `dsh web`，再打开 App（对应下面的"本地打包"）。
 - 分发给别人用：别人的电脑也要装 dsh 并启动它 —— 如果希望"装完即用"，见文末【进阶：把 dsh 服务打进安装包】。
 
+**关于认证（auth token）——首次必须做一次**：新版 dsh web 启用了浏览器认证，直接访问
+`http://127.0.0.1:3080/` 会返回 401。首次打开 App 时，把 `dsh web` 启动时**终端打印的那条
+链接**（形如 `dsh web: http://127.0.0.1:3080/?token=…`）粘贴进 App 弹出的认证界面即可。
+token 是每个 dsh web 进程随机生成的、重启就换，**没法预先写进安装包**；但用它换取一次
+cookie 后本机会记住 **30 天**，期间打开 App 无需再次输入。详见【常见问题】。
+
 ## 安装 DeepSeek Harness 本体（`dsh`）
 
 桌面壳只是"窗户"，先装好"服务" dsh 本体才看得见风景。
@@ -47,8 +53,13 @@ cd deepseek-harness && pnpm install && pnpm run build
 pnpm dsh web
 ```
 
-启动后服务地址：http://127.0.0.1:3080（默认）。确认 `curl http://127.0.0.1:3080/` 有响应，
-再打开桌面 App 即可。升级/反馈/插件生态请看原仓库的
+启动后服务地址：http://127.0.0.1:3080（默认）。终端会打印一条带 token 的链接
+（`dsh web: http://127.0.0.1:3080/?token=…`）并自动用默认浏览器打开它，再打开桌面 App 即可。
+
+> ⚠️ `curl http://127.0.0.1:3080/` 现在返回 **401** 属于正常 —— 说明服务起来了、且认证已启用，
+> 不是"服务没启动"。要确认服务可用，看 HTTP 状态码是不是 200/303/401 即可。
+
+升级/反馈/插件生态请看原仓库的
 [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions)。
 
 ## 目录结构
@@ -61,6 +72,7 @@ deepseek-harness-app/
 │   ├── build-locally.sh          # 本地一键打包
 │   ├── external-links.js         # 注入脚本：外部链接一律用系统默认浏览器打开（防窗口被覆盖）
 │   ├── check-update.js           # 注入脚本：检测桌面壳新版本，提示用系统浏览器去下载
+│   ├── auth-token.js             # 注入脚本：401 时引导粘贴 dsh web 的带 token 链接，换取 30 天免认证
 │   ├── patch-pake-capability.js  # 构建前置：放行 http 本地服务调用 shell.open（修 Tauri v2 scope）
 │   └── make-icon.py              # 图标生成脚本（可选）
 ├── .gitignore
@@ -95,7 +107,7 @@ dsh web
 pake http://127.0.0.1:3080/ --name DeepSeekHarness --title "DeepSeek Harness" \
      --identifier com.deepseekharness.app --icon assets/icon.png \
      --width 1280 --height 800 --app-version 0.1.0 \
-     --inject scripts/external-links.js
+     --inject scripts/external-links.js,scripts/check-update.js,scripts/auth-token.js
 ```
 
 ## 二、GitHub Actions 自动打包 + 发布 （核心）
@@ -235,8 +247,49 @@ App 窗口保持不动。
 <details>
 <summary><b>打开 App 显示空白 / 连不上？</b></summary>
 
-确认 `dsh web` 已在运行且 `curl http://127.0.0.1:3080/` 有响应。
+确认 `dsh web` 已在运行（`curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3080/`
+返回 **200/303/401** 都算正常，401 只表示还没认证）。
 壳应用本身不启动服务（想开箱即用请看【进阶】）。
+
+如果界面停留在"需要认证"，见下面那条 FAQ。
+</details>
+
+<details>
+<summary><b>App 提示"需要认证" / 要我在终端里找 token？</b></summary>
+
+新版 dsh web 给浏览器界面加了认证（防止其它进程/网页直连本机 `127.0.0.1:3080` 的 API）：
+
+1. **不需要改安装包，也不需要重新打包。** token 是每个 `dsh web` 进程启动时**随机生成**的，
+   只存在于进程内存和启动打印的链接里，重启就换 —— 所以不可能预先写死进 App 的首页 URL。
+   App 的首页地址仍然是 `http://127.0.0.1:3080/`，只是在 401 时多了一个认证引导层。
+
+2. **首次打开 App**（或 cookie 失效后）窗口会显示认证界面。把 `dsh web` 启动时终端打印的
+   那行整条复制粘贴进去即可（只粘 token 部分也行）：
+
+   ```
+   dsh web: http://127.0.0.1:3080/?token=2wlGc88MorRNmSKBB0OdlLmjTTCrqQzoPzDxEBQ64WY
+   ```
+
+   点「认证并进入」→ App 访问 `/?token=…` → 服务端种 cookie 并重定向回干净 `/`。
+
+   > 注意：**别从浏览器地址栏复制**。dsh 自动打开浏览器后，地址栏已被重定向成干净的
+   > `/`，token 已经不在里面了；复制上面那行**终端输出**才有效。
+
+3. **之后 30 天不用再输。** 认证成功会种下绑定 `127.0.0.1:3080` 的签名 cookie
+   （`Max-Age=2592000` 秒，密钥持久化在 `~/.dsh/.credentials.yaml`），App 之后直接进入。
+   下列情况才会重新要求认证：
+   - cookie 超过 30 天，或 App 的 webview cookie/数据被清除；
+   - 删掉或替换了 `~/.dsh/.credentials.yaml` 中 `client-connection/browser-session` 记录；
+   - 换了端口（cookie 绑定 `host:port`，而壳默认固定 `127.0.0.1:3080`）。
+
+4. **排错**：
+   - 粘贴后仍回到认证界面、并提示"token 无效或已过期" → 多半是复制了**旧进程**的链接
+     或粘贴时被截断；改用当前正在运行的 dsh web 最新打印的那行重试。
+   - 必须用 `127.0.0.1:3080` 打开（与 token / cookie 的 authority 一致）。
+     用 `localhost:3080` 会因为 authority 不同而无法复用已有 cookie。
+
+实现见 `scripts/auth-token.js`（构建时经 `--inject` 注入）；它只做两件事：发现 401 页面就
+显示粘贴框，把解析出的 token 拼到 `/?token=` 上跳转，其余情况完全不干预页面。
 </details>
 
 <details>
